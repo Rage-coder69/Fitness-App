@@ -122,7 +122,7 @@ class _BMIScreenState extends State<BMIScreen> {
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: <Widget>[
                             const Text(
-                              'WEIGHT',
+                              'WEIGHT (KG)',
                               style: TextStyle(
                                 fontSize: 20.0,
                                 color: Colors.white,

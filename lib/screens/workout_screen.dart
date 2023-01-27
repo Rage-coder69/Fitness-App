@@ -58,7 +58,9 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
           } else {
             // Otherwise, display a loading indicator.
             return const Center(
-              child: CircularProgressIndicator(),
+              child: CircularProgressIndicator(
+                color: Color(0xFF184045),
+              ),
             );
           }
         },

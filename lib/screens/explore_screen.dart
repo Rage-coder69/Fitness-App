@@ -85,8 +85,10 @@ class _ExploreScreenState extends State<ExploreScreen> {
                   controller: searchController,
                   decoration: const InputDecoration(
                       hintText: 'Search',
-                      prefixIcon: Icon(Icons.search),
-                      prefixIconColor: Color(0xE8184045),
+                      prefixIcon: Icon(
+                        Icons.search,
+                        color: Color(0xE8184045),
+                      ),
                       focusColor: Color(0xE8184045),
                       focusedBorder: UnderlineInputBorder(
                         borderSide:
@@ -113,7 +115,9 @@ class _ExploreScreenState extends State<ExploreScreen> {
                   child: FutureBuilder(builder: (context, snapshot) {
                     if (articles.isEmpty) {
                       return const Center(
-                        child: CircularProgressIndicator(),
+                        child: CircularProgressIndicator(
+                          color: Color(0xFF184045),
+                        ),
                       );
                     } else {
                       return ListView.builder(

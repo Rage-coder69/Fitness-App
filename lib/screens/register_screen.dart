@@ -26,7 +26,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   // late String email;
   // late String password;
-  Uint8List? _image;
+  Uint8List _image = Uint8List(0);
   bool isLoading = false;
 
   pickImage(ImageSource source) async {
@@ -66,15 +66,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
         isLoading = false;
       });
       showSnackBar(res!, context);
+    } else {
+      setState(() {
+        isLoading = false;
+        _image = Uint8List(0);
+      });
+      nameTextFieldController.clear();
+      emailTextFieldController.clear();
+      passwordTextFieldController.clear();
+      Navigator.pop(context);
     }
-    setState(() {
-      isLoading = false;
-      _image = null;
-    });
-    nameTextFieldController.clear();
-    emailTextFieldController.clear();
-    passwordTextFieldController.clear();
-    Navigator.pop(context);
   }
 
   @override
@@ -114,6 +115,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
           )),
       body: ModalProgressHUD(
         inAsyncCall: isLoading,
+        progressIndicator: const CircularProgressIndicator(
+          color: Colors.white,
+        ),
         child: LayoutBuilder(
           builder: (context, constraints) => Stack(children: [
             Container(
@@ -169,7 +173,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         /*const SizedBox(height: 185.0),*/
                         Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 40.0, vertical: 15.0),
+                              horizontal: 40.0, vertical: 1.0),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
@@ -180,20 +184,20 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                 alignment: Alignment.center,
                                 child: Stack(
                                   children: [
-                                    _image != null
+                                    _image.length > 0
                                         ? CircleAvatar(
                                             radius: 64,
                                             backgroundImage:
-                                                MemoryImage(_image!),
+                                                MemoryImage(_image),
                                           )
                                         : const CircleAvatar(
                                             radius: 64,
-                                            backgroundImage: NetworkImage(
-                                                'http://t4.ftcdn.net/jpg/00/64/67/63/360_F_64676383_LdbmhiNM6Ypzb3FM4PPuFP9rHe7ri8Ju.jpg'),
+                                            backgroundImage:
+                                                AssetImage("images/user.jpg"),
                                           ),
                                     Positioned(
-                                      bottom: -10,
-                                      left: 80,
+                                      bottom: -5,
+                                      left: 90,
                                       child: IconButton(
                                         onPressed: selectImage,
                                         icon: const Icon(

@@ -5,6 +5,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:modal_progress_hud_nsn/modal_progress_hud_nsn.dart';
 
+import '../components/snackBar.dart';
+import '../utils/auth_methods.dart';
+
 class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
 
@@ -16,11 +19,39 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final _auth = FirebaseAuth.instance;
-  TextEditingController emailTextFieldController = TextEditingController();
-  TextEditingController passwordTextFieldController = TextEditingController();
-  late String email;
-  late String password;
-  bool isLoading = false;
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+  bool _isLoading = false;
+
+  @override
+  void dispose() {
+    // TODO: implement dispose
+    super.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
+  }
+
+  void signInUser() async {
+    setState(() {
+      _isLoading = true;
+    });
+    String? res = await AuthMethods().signInUser(
+      email: _emailController.text,
+      password: _passwordController.text,
+    );
+    if (res == 'success') {
+      setState(() {
+        _isLoading = false;
+      });
+      // showSnackBar(res!, context);
+      Navigator.pushNamed(context, DashBoardScreen.id);
+    } else {
+      setState(() {
+        _isLoading = false;
+      });
+      showSnackBar(res!, context);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -28,7 +59,10 @@ class _LoginScreenState extends State<LoginScreen> {
       resizeToAvoidBottomInset: false,
       extendBody: true,
       body: ModalProgressHUD(
-        inAsyncCall: isLoading,
+        progressIndicator: CircularProgressIndicator(
+          color: Colors.white,
+        ),
+        inAsyncCall: _isLoading,
         child: Stack(children: [
           Container(
             decoration: const BoxDecoration(
@@ -84,7 +118,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
                                 TextField(
-                                  controller: emailTextFieldController,
+                                  controller: _emailController,
                                   style: const TextStyle(
                                     color: Color(0xE8184045),
                                   ),
@@ -93,13 +127,10 @@ class _LoginScreenState extends State<LoginScreen> {
                                   decoration: kTextFieldDecoration.copyWith(
                                     hintText: 'Enter your email',
                                   ),
-                                  onChanged: (value) {
-                                    email = value;
-                                  },
                                 ),
                                 const SizedBox(height: 20.0),
                                 TextField(
-                                  controller: passwordTextFieldController,
+                                  controller: _passwordController,
                                   obscureText: true,
                                   style:
                                       const TextStyle(color: Color(0xE8184045)),
@@ -108,34 +139,10 @@ class _LoginScreenState extends State<LoginScreen> {
                                   decoration: kTextFieldDecoration.copyWith(
                                     hintText: 'Enter your password',
                                   ),
-                                  onChanged: (value) {
-                                    password = value;
-                                  },
                                 ),
                                 const SizedBox(height: 40.0),
                                 TextButton(
-                                  onPressed: () async {
-                                    setState(() {
-                                      isLoading = true;
-                                    });
-                                    try {
-                                      UserCredential user = await _auth
-                                          .signInWithEmailAndPassword(
-                                              email: email, password: password);
-                                      if (user != null) {
-                                        setState(() {
-                                          isLoading = false;
-                                        });
-                                        Navigator.pushNamed(
-                                            context, DashBoardScreen.id);
-                                      }
-                                    } catch (e) {
-                                      setState(() {
-                                        isLoading = false;
-                                      });
-                                      print(e);
-                                    }
-                                  },
+                                  onPressed: signInUser,
                                   style: TextButton.styleFrom(
                                     backgroundColor: const Color(0xFF184045),
                                     shape: RoundedRectangleBorder(

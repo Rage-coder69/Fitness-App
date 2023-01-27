@@ -18,7 +18,7 @@ class AuthMethods {
       if (email.isNotEmpty ||
           password.isNotEmpty ||
           name.isNotEmpty ||
-          file != null) {
+          file.length > 0) {
         UserCredential userCredential = await _auth
             .createUserWithEmailAndPassword(email: email, password: password);
         User? user = userCredential.user;
@@ -36,6 +36,8 @@ class AuthMethods {
         });
 
         res = 'success';
+      } else {
+        res = 'Please fill all the fields';
       }
     }
     //another way we can handle errors
@@ -46,20 +48,14 @@ class AuthMethods {
         res = 'The account already exists for that email.';
       } else if (e.code == 'invalid-email') {
         res = 'The email is invalid.';
-      } else {
-        res = e.message;
       }
     }
-    /*catch (e) {
-      res = e.toString();
-      print(e);
-    }*/
     return res;
   }
 
-  Future<String> signInUser(
+  Future<String?> signInUser(
       {required String email, required String password}) async {
-    String res = 'Some error occurred!';
+    String? res = 'Some error occurred!';
     try {
       if (email.isNotEmpty || password.isNotEmpty) {
         await _auth.signInWithEmailAndPassword(
@@ -73,6 +69,8 @@ class AuthMethods {
         res = 'No user found for that email.';
       } else if (e.code == 'wrong-password') {
         res = 'Wrong password provided for that user.';
+      } else {
+        res = e.message;
       }
     }
     return res;

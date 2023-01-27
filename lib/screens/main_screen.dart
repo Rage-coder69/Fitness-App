@@ -45,6 +45,9 @@ class _MainScreenState extends State<MainScreen> {
     return Scaffold(
       extendBody: true,
       body: ModalProgressHUD(
+        progressIndicator: const CircularProgressIndicator(
+          color: Colors.white,
+        ),
         inAsyncCall: isLoading,
         child: Stack(
           children: [
@@ -59,8 +62,8 @@ class _MainScreenState extends State<MainScreen> {
                   ],
                 ),
                 image: DecorationImage(
-                  image: NetworkImage(
-                      'http://harisrahat.mo.cloudinary.net/fitness') /*AssetImage('images/home.jpg')*/,
+                  image: AssetImage(
+                      'images/home.jpg') /*NetworkImage('http://harisrahat.mo.cloudinary.net/fitness')*/ /*AssetImage('images/home.jpg')*/,
                   fit: BoxFit.cover,
                 ),
               ),

@@ -34,7 +34,24 @@ class _ArticleScreenState extends State<ArticleScreen> {
     final dynamic article = ModalRoute.of(context)?.settings.arguments;
     return Scaffold(
       appBar: AppBar(
+        elevation: 0.0,
+        backgroundColor: Colors.white,
         title: const Text('Article'),
+        centerTitle: true,
+        titleTextStyle: const TextStyle(
+          color: Color(0xE8184045),
+          fontSize: 20.0,
+          fontWeight: FontWeight.w500,
+        ),
+        leading: IconButton(
+          onPressed: () {
+            Navigator.pop(context);
+          },
+          icon: const Icon(
+            Icons.arrow_back_ios,
+            color: Color(0xE8184045),
+          ),
+        ),
       ),
       body: Column(
         children: [
@@ -48,15 +65,58 @@ class _ArticleScreenState extends State<ArticleScreen> {
               ),
             ),
           ),
-          Text(article['title']),
-          Text(article['description']),
-          Text(article['content']),
-          TextButton(
-            onPressed: () {
-              _launchURL(context, article['url']);
-            },
-            child: const Text('Read More'),
-          ),
+          Expanded(
+              child: Container(
+            padding: const EdgeInsets.all(10.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  article['title'].toString(),
+                  style: const TextStyle(
+                    fontSize: 20.0,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(
+                  height: 10.0,
+                ),
+                Text(
+                  article['description'].toString(),
+                  style: const TextStyle(
+                    color: Color(0xE8184045),
+                    fontSize: 20.0,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(
+                  height: 10.0,
+                ),
+                Text(
+                  article['content'].toString(),
+                  style: const TextStyle(
+                    color: Color(0xE8184045),
+                    fontSize: 20.0,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(
+                  height: 10.0,
+                ),
+                TextButton(
+                  style: TextButton.styleFrom(
+                    primary: Colors.white,
+                    backgroundColor: Color(0xFF184045),
+                  ),
+                  onPressed: () {
+                    _launchURL(context, article['url']);
+                  },
+                  child: const Text('Read More'),
+                ),
+              ],
+            ),
+          )),
         ],
       ),
     );

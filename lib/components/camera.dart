@@ -84,7 +84,10 @@ class _CameraState extends State<Camera> {
                   return CameraPreview(_controller);
                 } else {
                   // Otherwise, display a loading indicator.
-                  return const Center(child: CircularProgressIndicator());
+                  return const Center(
+                      child: CircularProgressIndicator(
+                    color: Color(0xFF184045),
+                  ));
                 }
               },
             ),
