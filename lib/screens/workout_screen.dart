@@ -1,7 +1,7 @@
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 
-import '../components/camera.dart';
+import '../components/round_icon_button.dart';
 
 class WorkoutScreen extends StatefulWidget {
   const WorkoutScreen({
@@ -17,11 +17,36 @@ class WorkoutScreen extends StatefulWidget {
 class _WorkoutScreenState extends State<WorkoutScreen> {
   bool _isBackCamera = false;
 
+  late CameraController _controller;
+  late Future<void> _initializeControllerFuture;
+
+
   void flipCamera() {
     setState(() {
       _isBackCamera = !_isBackCamera;
     });
+    getCamera();
   }
+
+  Future<void> getCamera() async {
+    dynamic cameras = availableCameras.call();
+    dynamic camera = cameras[_isBackCamera ?  0 : 1 ];
+    /*setState(() {
+      _camera = camera;
+    });*/
+    _controller = CameraController(
+      // Get a specific camera from the list of available cameras.
+      camera,
+      // Define the resolution to use.
+      ResolutionPreset.ultraHigh,
+    );
+  }
+
+  Future<void> initState () async {
+    super.initState();
+    getCamera();
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -46,24 +71,60 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
           ),
         ),
       ),
-      body: FutureBuilder<List<CameraDescription>>(
-        future: availableCameras.call(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.done) {
-            // If the Future is complete, display the preview.
-            return Camera(
-              camera: snapshot.data![_isBackCamera ? 0 : 1],
-              flipCamera: flipCamera,
-            );
-          } else {
-            // Otherwise, display a loading indicator.
-            return const Center(
-              child: CircularProgressIndicator(
-                color: Color(0xFF184045),
+      body: Container(
+        padding: const EdgeInsets.all(0.0),
+        width: MediaQuery.of(context).size.width,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              flex: 7,
+              child: FutureBuilder<void>(
+                future: _initializeControllerFuture,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.done) {
+                    // If the Future is complete, display the preview.
+                    return CameraPreview(_controller);
+                  } else {
+                    // Otherwise, display a loading indicator.
+                    return const Center(
+                        child: CircularProgressIndicator(
+                          color: Color(0xFF184045),
+                        ));
+                  }
+                },
               ),
-            );
-          }
-        },
+            ),
+            Expanded(
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Color(0xFF184045),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      RoundIconButton(
+                        onTap: () {
+                          flipCamera();
+                        },
+                        icon: Icons.flip_camera_ios_rounded,
+                      ),
+                      RoundIconButton(
+                        icon: Icons.play_arrow_rounded,
+                        onTap: () {
+
+                        },
+                      ),
+                      RoundIconButton(
+                        onTap: () {
+                        },
+                        icon: Icons.pause_circle_filled_rounded,
+                      ),
+                    ],
+                  ),
+                )),
+          ],
+        ),
       ),
     );
   }

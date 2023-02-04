@@ -124,11 +124,11 @@ class _MainScreenState extends State<MainScreen> {
                             onPressed: () {
                               Navigator.pushNamed(context, LoginScreen.id);
                             },
-                            shape: const CircleBorder(
+                            shape: CircleBorder(
                               side: BorderSide(
                                 color: Colors.black,
                                 width: 5.0,
-                                strokeAlign: StrokeAlign.outside,
+                                //strokeAlign: StrokeAlign.inside,
                               ),
                             ),
                             fillColor: Colors.white,
