@@ -17,32 +17,23 @@ class WorkoutScreen extends StatefulWidget {
 class _WorkoutScreenState extends State<WorkoutScreen> {
   bool _isBackCamera = false;
 
-  late CameraController _controller;
-  late Future<void> _initializeControllerFuture;
+  CameraController? _controller;
 
 
   void flipCamera() {
-    setState(() {
-      _isBackCamera = !_isBackCamera;
-    });
+    _isBackCamera = !_isBackCamera;
     getCamera();
   }
 
   Future<void> getCamera() async {
-    dynamic cameras = availableCameras.call();
+    dynamic cameras = await availableCameras.call();
     dynamic camera = cameras[_isBackCamera ?  0 : 1 ];
-    /*setState(() {
-      _camera = camera;
-    });*/
-    _controller = CameraController(
-      // Get a specific camera from the list of available cameras.
-      camera,
-      // Define the resolution to use.
-      ResolutionPreset.ultraHigh,
-    );
+    setState(() {
+      _controller = CameraController(camera, ResolutionPreset.ultraHigh);
+    });
   }
 
-  Future<void> initState () async {
+  void initState () {
     super.initState();
     getCamera();
   }
@@ -80,11 +71,11 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
             Expanded(
               flex: 7,
               child: FutureBuilder<void>(
-                future: _initializeControllerFuture,
+                future: _controller?.initialize(),
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.done) {
                     // If the Future is complete, display the preview.
-                    return CameraPreview(_controller);
+                    return CameraPreview(_controller!);
                   } else {
                     // Otherwise, display a loading indicator.
                     return const Center(
@@ -112,7 +103,6 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
                       RoundIconButton(
                         icon: Icons.play_arrow_rounded,
                         onTap: () {
-
                         },
                       ),
                       RoundIconButton(
@@ -122,10 +112,11 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
                       ),
                     ],
                   ),
-                )),
+                ),),
           ],
         ),
       ),
     );
   }
 }
+
