@@ -1,3 +1,4 @@
+/*
 import 'package:app/components/round_icon_button.dart';
 import 'package:app/utils/pose_detector.dart';
 import 'package:camera/camera.dart';
@@ -30,7 +31,8 @@ class _CameraState extends State<Camera> {
   @override
   void initState() {
     super.initState();
-    /*Alert(
+    */
+/*Alert(
       context: context,
       title: 'Select Camera',
       desc:
@@ -45,7 +47,8 @@ class _CameraState extends State<Camera> {
           color: const Color(0xFF184045),
         ),
       ],
-    ).show();*/
+    ).show();*//*
+
     // To display the current output from the Camera,
     // create a CameraController.
     _controller = CameraController(
@@ -163,3 +166,4 @@ class _CameraState extends State<Camera> {
     );
   }
 }
+*/

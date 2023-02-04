@@ -45,7 +45,6 @@ dependencies:
   camera: ^0.10.0+1
   path_provider: ^2.0.11
   path: ^1.8.2
-  google_mlkit_pose_detection: ^0.5.0
   rflutter_alert: ^2.0.4
   modal_progress_hud_nsn: ^0.3.0
   flutter_native_splash: ^2.2.9
