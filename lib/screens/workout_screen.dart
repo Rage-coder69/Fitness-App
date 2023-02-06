@@ -1,7 +1,10 @@
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_webrtc/flutter_webrtc.dart';
+
 
 import '../components/round_icon_button.dart';
+import '../utils/signaling.dart';
 
 class WorkoutScreen extends StatefulWidget {
   const WorkoutScreen({
@@ -19,6 +22,13 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
 
   CameraController? _controller;
 
+  // signaling
+  Signaling signaling = Signaling();
+  MediaStream? _localStream;
+  RTCVideoRenderer _localRenderer = RTCVideoRenderer();
+  RTCVideoRenderer _remoteRenderer = RTCVideoRenderer();
+  String? roomId;
+
 
   void flipCamera() {
     _isBackCamera = !_isBackCamera;
@@ -33,9 +43,42 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
     });
   }
 
+  final Map<String, dynamic> mediaConstraints = {
+    "audio": true,
+    "video": {
+      "mandatory": {
+        "minWidth": '740', // Provide your own width, height and frame rate here
+        "minHeight": '580',
+        "minFrameRate": '60',
+      },
+      "facingMode": "user",
+      "optional": [],
+    }
+  };
+
+
   void initState () {
     super.initState();
-    getCamera();
+    _localRenderer.initialize();
+    mediaDevices.getUserMedia(mediaConstraints).then((stream){
+      _localStream = stream;
+      _localRenderer.srcObject = _localStream;
+    });
+    _remoteRenderer.initialize();
+    signaling.onAddRemoteStream = (stream) {
+      _remoteRenderer.srcObject = stream;
+    };
+    setState(() {});
+
+    //getCamera();
+  }
+
+  void dispose() {
+    // Dispose of the controller when the widget is disposed.
+    _controller?.dispose();
+    _localRenderer.dispose();
+    _remoteRenderer.dispose();
+    super.dispose();
   }
 
 
@@ -70,20 +113,9 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
           children: [
             Expanded(
               flex: 7,
-              child: FutureBuilder<void>(
-                future: _controller?.initialize(),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.done) {
-                    // If the Future is complete, display the preview.
-                    return CameraPreview(_controller!);
-                  } else {
-                    // Otherwise, display a loading indicator.
-                    return const Center(
-                        child: CircularProgressIndicator(
-                          color: Color(0xFF184045),
-                        ));
-                  }
-                },
+              child: RTCVideoView(_localRenderer,
+                mirror: true,
+                objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
               ),
             ),
             Expanded(
@@ -120,3 +152,18 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
   }
 }
 
+/*FutureBuilder<void>(
+                future: _controller?.initialize(),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.done) {
+                    // If the Future is complete, display the preview.
+                    return CameraPreview(_controller!);
+                  } else {
+                    // Otherwise, display a loading indicator.
+                    return const Center(
+                        child: CircularProgressIndicator(
+                          color: Color(0xFF184045),
+                        ));
+                  }
+                },
+              ),*/
