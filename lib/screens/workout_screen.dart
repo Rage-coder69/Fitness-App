@@ -1,10 +1,12 @@
-import 'package:camera/camera.dart';
+import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
-
+import 'package:http/http.dart' as http;
 
 import '../components/round_icon_button.dart';
-import '../utils/signaling.dart';
+
+typedef void StreamStateCallback(MediaStream stream);
 
 class WorkoutScreen extends StatefulWidget {
   const WorkoutScreen({
@@ -18,69 +20,143 @@ class WorkoutScreen extends StatefulWidget {
 }
 
 class _WorkoutScreenState extends State<WorkoutScreen> {
-  bool _isBackCamera = false;
-
-  CameraController? _controller;
-
-  // signaling
-  Signaling signaling = Signaling();
+  RTCPeerConnection? _peerConnection;
   MediaStream? _localStream;
-  RTCVideoRenderer _localRenderer = RTCVideoRenderer();
-  RTCVideoRenderer _remoteRenderer = RTCVideoRenderer();
-  String? roomId;
+  final _localRenderer = RTCVideoRenderer();
 
-
-  void flipCamera() {
-    _isBackCamera = !_isBackCamera;
-    getCamera();
+  void initRenderers() async {
+    await _localRenderer.initialize();
   }
 
-  Future<void> getCamera() async {
-    dynamic cameras = await availableCameras.call();
-    dynamic camera = cameras[_isBackCamera ?  0 : 1 ];
-    setState(() {
-      _controller = CameraController(camera, ResolutionPreset.ultraHigh);
-    });
-  }
-
-  final Map<String, dynamic> mediaConstraints = {
-    "audio": true,
-    "video": {
-      "mandatory": {
-        "minWidth": '740', // Provide your own width, height and frame rate here
-        "minHeight": '580',
-        "minFrameRate": '60',
-      },
-      "facingMode": "user",
-      "optional": [],
+  void _onTrack(RTCTrackEvent event) {
+    print("TRACK EVENT: ${event.streams.map((e) => e.id)}, ${event.track.id}");
+    if (event.track.kind == "video") {
+      print("HERE");
+      _localRenderer.initialize();
+      setState(() {
+        _localRenderer.srcObject = event.streams[0];
+      });
     }
-  };
+  }
 
+  Future<bool> _waitForGatheringComplete(_) async {
+    print("WAITING FOR GATHERING COMPLETE");
+    if (_peerConnection!.iceGatheringState ==
+        RTCIceGatheringState.RTCIceGatheringStateComplete) {
+      return true;
+    } else {
+      await Future.delayed(Duration(seconds: 1));
+      return await _waitForGatheringComplete(_);
+    }
+  }
 
-  void initState () {
-    super.initState();
-    _localRenderer.initialize();
-    mediaDevices.getUserMedia(mediaConstraints).then((stream){
-      _localStream = stream;
-      _localRenderer.srcObject = _localStream;
-    });
-    _remoteRenderer.initialize();
-    signaling.onAddRemoteStream = (stream) {
-      _remoteRenderer.srcObject = stream;
+  Future<void> _negotiateRemoteConnection() async {
+    return _peerConnection!
+        .createOffer()
+        .then((offer) {
+          return _peerConnection!.setLocalDescription(offer);
+        })
+        .then(_waitForGatheringComplete)
+        .then((_) async {
+          print("after waiting");
+          var des = await _peerConnection!.getLocalDescription();
+          var headers = {
+            'Content-type': 'application/json',
+          };
+
+          var request = http.Request(
+            'POST',
+            Uri.parse('http://192.168.1.2:5000/offer'),
+          );
+
+          request.body = jsonEncode(
+              {"sdp": des!.sdp, "type": des.type, "exercise": "pushUp"});
+
+          request.headers.addAll(headers);
+
+          http.StreamedResponse response = await request.send();
+          print(response.statusCode);
+          if (response.statusCode == 200) {
+            String data = await response.stream.bytesToString();
+            var dataMap = jsonDecode(data);
+            print(dataMap["type"]);
+            await _peerConnection!.setRemoteDescription(
+              RTCSessionDescription(
+                dataMap["sdp"],
+                dataMap["type"],
+              ),
+            );
+          } else {
+            print(response.reasonPhrase);
+          }
+        });
+  }
+
+  Future<void> _makeCall() async {
+    var configuration = <String, dynamic>{
+      'iceServers': [],
+      'sdpSemantics': 'unified-plan',
     };
-    setState(() {});
 
-    //getCamera();
+    //* Create Peer Connection
+    if (_peerConnection != null) return;
+    _peerConnection = await createPeerConnection(configuration);
+
+    _peerConnection!.onTrack = _onTrack;
+
+    final Map<String, dynamic> mediaConstraints = {
+      'audio': false,
+      'video': {
+        'mandatory': {
+          'minWidth': // parse to int here
+              MediaQuery.of(context).size.width.toInt().toString(),
+          'minHeight': MediaQuery.of(context).size.height.toInt().toString(),
+          'minFrameRate': '30',
+          'maxFrameRate': '60'
+        },
+        'facingMode': 'user',
+        'optional': [],
+      }
+    };
+
+    try {
+      var stream = await navigator.mediaDevices.getUserMedia(mediaConstraints);
+
+      _localStream = stream;
+
+      stream.getTracks().forEach((element) {
+        _peerConnection!.addTrack(element, stream);
+      });
+
+      await _negotiateRemoteConnection();
+    } catch (e) {
+      print(e.toString());
+    }
   }
 
+  @override
+  void initState() {
+    super.initState();
+    initRenderers();
+  }
+
+  @override
   void dispose() {
-    // Dispose of the controller when the widget is disposed.
-    _controller?.dispose();
-    _localRenderer.dispose();
-    _remoteRenderer.dispose();
     super.dispose();
+    _localRenderer.dispose();
   }
 
+  Future<void> _stopCall() async {
+    try {
+      await _peerConnection?.close();
+      setState(() {
+        _peerConnection = null;
+        _localRenderer.srcObject = null;
+      });
+    } catch (e) {
+      print(e.toString());
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -113,57 +189,49 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
           children: [
             Expanded(
               flex: 7,
-              child: RTCVideoView(_localRenderer,
-                mirror: true,
-                objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
-              ),
+              child: _localRenderer.srcObject != null
+                  ? RTCVideoView(_localRenderer,
+                      mirror: true,
+                      objectFit:
+                          RTCVideoViewObjectFit.RTCVideoViewObjectFitCover)
+                  : Container(
+                      decoration: BoxDecoration(
+                        color: Color(0xFF184045),
+                      ),
+                      child: const Center(
+                        child: Text(
+                          'No Video',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 20.0,
+                          ),
+                        ),
+                      ),
+                    ),
             ),
             Expanded(
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Color(0xFF184045),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      RoundIconButton(
-                        onTap: () {
-                          flipCamera();
-                        },
-                        icon: Icons.flip_camera_ios_rounded,
-                      ),
-                      RoundIconButton(
-                        icon: Icons.play_arrow_rounded,
-                        onTap: () {
-                        },
-                      ),
-                      RoundIconButton(
-                        onTap: () {
-                        },
-                        icon: Icons.pause_circle_filled_rounded,
-                      ),
-                    ],
-                  ),
-                ),),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Color(0xFF184045),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    RoundIconButton(
+                      icon: Icons.play_arrow_rounded,
+                      onTap: _makeCall,
+                    ),
+                    RoundIconButton(
+                      onTap: _stopCall,
+                      icon: Icons.pause_circle_filled_rounded,
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ],
         ),
       ),
     );
   }
 }
-
-/*FutureBuilder<void>(
-                future: _controller?.initialize(),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.done) {
-                    // If the Future is complete, display the preview.
-                    return CameraPreview(_controller!);
-                  } else {
-                    // Otherwise, display a loading indicator.
-                    return const Center(
-                        child: CircularProgressIndicator(
-                          color: Color(0xFF184045),
-                        ));
-                  }
-                },
-              ),*/

@@ -5,18 +5,6 @@ import 'package:flutter_webrtc/flutter_webrtc.dart';
 typedef void StreamStateCallback(MediaStream stream);
 
 class Signaling {
-
-  Map<String, dynamic> configuration = {
-    'iceServers': [
-      {
-        'url': [
-          'stun:stun1.l.google.com:19302',
-          'stun:stun2.l.google.com:19302',
-        ]
-      },
-    ]
-  };
-
   RTCPeerConnection? peerConnection;
   MediaStream? localStream;
   MediaStream? remoteStream;
@@ -24,13 +12,22 @@ class Signaling {
   String? currentRoomText;
   StreamStateCallback? onAddRemoteStream;
 
-  Future<String> createRoom(RTCVideoRenderer remoteRenderer) async {
+  Map<String, dynamic> configuration = {
+    'iceServers': [
+      {'url': 'stun:stun.l.google.com:19302'},
+    ]
+  };
 
+  Future<String> createRoom() async {
     FirebaseFirestore db = FirebaseFirestore.instance;
     DocumentReference roomRef = db.collection('rooms').doc();
     print('Create peer connection with configuration: $configuration');
 
-    peerConnection = await createPeerConnection(configuration);
+    peerConnection = await createPeerConnection(configuration, {
+      'optional': [
+        {'DtlsSrtpKeyAgreement': true},
+      ]
+    });
 
     registerPeerConnectionListeners();
 
@@ -56,6 +53,7 @@ class Signaling {
     await roomRef.set(roomWithOffer);
 
     var roomId = roomRef.id;
+    print('New room created with SDP offer. Room ID: $roomId');
 
     peerConnection?.onTrack = (RTCTrackEvent event) {
       print('Got remote track: ${event.streams[0]}');
@@ -68,9 +66,11 @@ class Signaling {
       // listening for remote session description below
       roomRef.snapshots().listen((snapshot) async {
         Map<String, dynamic> data = snapshot.data() as Map<String, dynamic>;
-        if (peerConnection?.getRemoteDescription() != null && data['answer'] != null) {
+        if (peerConnection?.getRemoteDescription() != null &&
+            data['answer'] != null) {
           print('Got remote description: ${data['answer']}');
-          var  answer = RTCSessionDescription(data['answer']['sdp'], data['answer']['type']);
+          var answer = RTCSessionDescription(
+              data['answer']['sdp'], data['answer']['type']);
           await peerConnection!.setRemoteDescription(answer);
         }
       });
@@ -79,26 +79,23 @@ class Signaling {
       roomRef.collection('calleeCandidates').snapshots().listen((snapshot) {
         snapshot.docChanges.forEach((change) async {
           if (change.type == DocumentChangeType.added) {
-            Map<String, dynamic> data= change.doc.data() as Map<String, dynamic>;
+            Map<String, dynamic> data =
+                change.doc.data() as Map<String, dynamic>;
             print('Got new remote ICE candidate: ${jsonEncode(data)}');
-            peerConnection!.addCandidate(
-                RTCIceCandidate(
-                    data['candidate'],
-                    data['sdpMid'],
-                    data['sdpMLineIndex']));
+            peerConnection!.addCandidate(RTCIceCandidate(
+                data['candidate'], data['sdpMid'], data['sdpMLineIndex']));
           }
         });
       });
     };
 
-    return "roomId";
-
+    return roomId;
   }
 
   Future<void> openUserMedia(
-      RTCVideoRenderer localVideo,
-      RTCVideoRenderer remoteVideo,
-      ) async {
+    RTCVideoRenderer localVideo,
+    RTCVideoRenderer remoteVideo,
+  ) async {
     var stream = await navigator.mediaDevices
         .getUserMedia({'video': true, 'audio': false});
 
@@ -158,5 +155,4 @@ class Signaling {
       remoteStream = stream;
     };
   }
-
 }
