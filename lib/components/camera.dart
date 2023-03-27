@@ -1,9 +1,13 @@
+import 'dart:async';
+
 import 'package:app/components/round_icon_button.dart';
 import 'package:app/utils/pose_detector.dart';
 import 'package:camera/camera.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
+
+import '../utils/pose_painter.dart';
 
 class Camera extends StatefulWidget {
   const Camera({Key? key, required this.camera, required this.flipCamera})
@@ -19,51 +23,118 @@ class Camera extends StatefulWidget {
 class _CameraState extends State<Camera> {
   late CameraController _controller;
   late Future<void> _initializeControllerFuture;
-  List<Pose> poses = [];
+  StreamController<List<Pose>> _poseStreamController =
+      StreamController.broadcast();
 
-  Uint8List concatenatePlanes(List<Plane> planes) {
+  List<Pose> poses = [];
+  bool _isDetecting = false;
+
+  late PoseDetector poseDetector;
+
+  /*Uint8List concatenatePlanes(List<Plane> planes) {
     final WriteBuffer allBytes = WriteBuffer();
     planes.forEach((Plane plane) => allBytes.putUint8List(plane.bytes));
     return allBytes.done().buffer.asUint8List();
+  }*/
+
+  InputImageRotation _rotationIntToImageRotation(int rotation) {
+    switch (rotation) {
+      case 0:
+        return InputImageRotation.rotation0deg;
+      case 90:
+        return InputImageRotation.rotation90deg;
+      case 180:
+        return InputImageRotation.rotation180deg;
+      case 270:
+        return InputImageRotation.rotation270deg;
+      default:
+        throw Exception('Unsupported rotation value: $rotation');
+    }
   }
 
   @override
   void initState() {
     super.initState();
-    /*Alert(
-      context: context,
-      title: 'Select Camera',
-      desc:
-          'Select the camera you want to use, it can be either the front or the back camera. Press the camera icon below to switch between the two.',
-      buttons: [
-        DialogButton(
-          child: const Text(
-            'Ok',
-            style: TextStyle(color: Colors.white, fontSize: 20),
-          ),
-          onPressed: () {},
-          color: const Color(0xFF184045),
-        ),
-      ],
-    ).show();*/
-    // To display the current output from the Camera,
-    // create a CameraController.
     _controller = CameraController(
-      // Get a specific camera from the list of available cameras.
       widget.camera,
-      // Define the resolution to use.
       ResolutionPreset.ultraHigh,
+      enableAudio: false,
     );
-
-    // Next, initialize the controller. This returns a Future.
     _initializeControllerFuture = _controller.initialize();
+    poseDetector = PoseDetector(
+      options: PoseDetectorOptions(
+        mode: PoseDetectionMode.stream,
+        model: PoseDetectionModel.base,
+      ),
+    );
   }
 
   @override
   void dispose() {
-    // Dispose of the controller when the widget is disposed.
     _controller.dispose();
+    poseDetector.close();
+    _poseStreamController.close();
     super.dispose();
+  }
+
+  Future<void> _onImageStream(CameraImage image) async {
+    final rotation = _controller.value.deviceOrientation.index;
+    final inputImage = InputImage.fromBytes(
+      bytes: image.planes[0].bytes,
+      inputImageData: InputImageData(
+        size: Size(image.width.toDouble(), image.height.toDouble()),
+        imageRotation: _rotationIntToImageRotation(rotation),
+        inputImageFormat: InputImageFormatValue.fromRawValue(image.format.raw)!,
+        planeData: image.planes.map(
+          (Plane plane) {
+            return InputImagePlaneMetadata(
+              bytesPerRow: plane.bytesPerRow,
+              height: plane.height,
+              width: plane.width,
+            );
+          },
+        ).toList(),
+      ),
+    );
+
+    final poses = await poseDetector.processImage(inputImage);
+
+    _poseStreamController.add(poses);
+  }
+
+  Widget _buildCameraPreview() {
+    return Positioned.fill(
+      child: AspectRatio(
+        aspectRatio: _controller.value.aspectRatio,
+        child: CameraPreview(_controller),
+      ),
+    );
+  }
+
+  Widget _buildPoseLandmarks() {
+    return Positioned.fill(
+      child: StreamBuilder<List<Pose>>(
+        stream: _poseStreamController.stream,
+        builder: (context, snapshot) {
+          if (snapshot.hasData) {
+            final poses = snapshot.data!;
+            for (var pose in poses) {
+              return CustomPaint(
+                painter: PosePainter(
+                  pose,
+                  Size(_controller.value.previewSize!.height.toDouble(),
+                      _controller.value.previewSize!.width.toDouble()),
+                  MediaQuery.of(context).size,
+                ),
+              );
+            }
+            return SizedBox.shrink();
+          } else {
+            return SizedBox.shrink();
+          }
+        },
+      ),
+    );
   }
 
   @override
@@ -76,20 +147,11 @@ class _CameraState extends State<Camera> {
         children: [
           Expanded(
             flex: 7,
-            child: FutureBuilder<void>(
-              future: _initializeControllerFuture,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.done) {
-                  // If the Future is complete, display the preview.
-                  return CameraPreview(_controller);
-                } else {
-                  // Otherwise, display a loading indicator.
-                  return const Center(
-                      child: CircularProgressIndicator(
-                    color: Color(0xFF184045),
-                  ));
-                }
-              },
+            child: Stack(
+              children: [
+                _buildCameraPreview(),
+                _buildPoseLandmarks(),
+              ],
             ),
           ),
           Expanded(
@@ -109,7 +171,34 @@ class _CameraState extends State<Camera> {
                 RoundIconButton(
                   icon: Icons.play_arrow_rounded,
                   onTap: () async {
-                    try {
+                    setState(() {
+                      _isDetecting = true;
+                      // _poseStreamController.add(_controller);
+                      _controller.startImageStream(_onImageStream);
+                    });
+                  },
+                ),
+                RoundIconButton(
+                  onTap: () {
+                    setState(() {
+                      _isDetecting = false;
+                      _poseStreamController.close();
+                      _controller.stopImageStream();
+                    });
+                  },
+                  icon: Icons.pause_circle_filled_rounded,
+                ),
+              ],
+            ),
+          )),
+        ],
+      ),
+    );
+  }
+}
+
+/*
+try {
                       // Ensure that the camera is initialized.
                       await _initializeControllerFuture;
 
@@ -142,24 +231,62 @@ class _CameraState extends State<Camera> {
                       // If an error occurs, log the error to the console.
                       print(e);
                     }
-                  },
-                ),
-                RoundIconButton(
-                  onTap: () {
-                    try {
-                      _controller.stopImageStream();
-                    } catch (e) {
-                      // If an error occurs, log the error to the console.
-                      print(e);
-                    }
-                  },
-                  icon: Icons.pause_circle_filled_rounded,
-                ),
-              ],
-            ),
-          )),
-        ],
-      ),
-    );
-  }
-}
+*/
+//https://www.instagram.com/reel/CoreJO8IdmP/?utm_source=ig_web_copy_link
+
+/*StreamBuilder(
+                    stream: controllerStream.stream,
+                    builder: (context, snapshot) {
+                      if (!_controller.value.isInitialized) {
+                        return Container();
+                      }
+                      final size = MediaQuery.of(context).size;
+                      final deviceRatio = size.width / size.height;
+                      return FutureBuilder(
+                        future: _detectPoses(),
+                        builder: (context, snapshot) {
+                          if (!snapshot.hasData) {
+                            return Container();
+                          }
+                          final poses = snapshot.data;
+                          return Stack(
+                            children: [
+                              Transform.scale(
+                                scale:
+                                    _controller.value.aspectRatio / deviceRatio,
+                                child: Center(
+                                  child: AspectRatio(
+                                    aspectRatio: _controller.value.aspectRatio,
+                                    child: CameraPreview(_controller),
+                                  ),
+                                ),
+                              ),
+                              for (final pose in poses!)
+                                CustomPaint(
+                                  painter: PosePainter(
+                                    pose,
+                                    _controller.value.previewSize!,
+                                    size,
+                                  ),
+                                ),
+                            ],
+                          );
+                        },
+                      );
+                    },
+                  )
+                : FutureBuilder<void>(
+                    future: _initializeControllerFuture,
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.done) {
+                        // If the Future is complete, display the preview.
+                        return CameraPreview(_controller);
+                      } else {
+                        // Otherwise, display a loading indicator.
+                        return const Center(
+                            child: CircularProgressIndicator(
+                          color: Color(0xFF184045),
+                        ));
+                      }
+                    },
+                  ),*/
