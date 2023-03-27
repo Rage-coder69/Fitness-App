@@ -10,13 +10,13 @@ class ArticleScreen extends StatefulWidget {
 }
 
 class _ArticleScreenState extends State<ArticleScreen> {
-  Future<void> _launchUrl(String url) async {
-    /*final uri = Uri.parse(url);
-    */ /*await launchUrl(Uri.parse(url), mode: LaunchMode.inAppWebView);*/ /*
+  /*Future<void> _launchUrl(String url) async {
+    final uri = Uri.parse(url);
+    await launchUrl(Uri.parse(url), mode: LaunchMode.inAppWebView);
     if (!await launchUrl(uri, mode: LaunchMode.platformDefault)) {
       throw 'Could not launch $uri';
-    }*/
-  }
+    }
+  }*/
 
   void _launchURL(BuildContext context, String url) async {
     try {
